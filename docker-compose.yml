@@ -6,7 +6,7 @@ services:
         command: --default-authentication-plugin=mysql_native_password
         restart: always
         environment:
-            MYSQL_ROOT_PASSWORD: sq1dev
+            MYSQL_ROOT_PASSWORD: ****
         volumes:
             - ./docker/mysqldata:/var/lib/mysql
             - ./docker/mysql/createDevDB.sql:/docker-entrypoint-initdb.d/init1.sql
