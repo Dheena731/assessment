@@ -238,332 +238,277 @@
         </div>
 
         <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // ============ STATE ============
-            let timeLeft = parseInt({{ $timeLeft }});  // ✅ Convert to integer
-            let timerInterval;
-            let violations = 0;
-            let currentQuestion = 1;
-            let isSubmitting = false;
-            const totalQuestions = {{ $questions->count() }};
-            const MAX_VIOLATIONS = 3;
-            const assessmentId = {{ $result->id }};
+         
+document.addEventListener('DOMContentLoaded', function() {
+    // ============ STATE ============
+    let timeLeft = parseInt({{ $timeLeft }});
+    let timerInterval;
+    let violations = 0;
+    let currentQuestion = 1;
+    let isSubmitting = false;
+    const totalQuestions = {{ $questions->count() }};
+    const MAX_VIOLATIONS = 3;
+    const assessmentId = {{ $result->id }};
 
-            // Create question ID map
-            const questionIds = {
-                @foreach($questions as $index => $question)
-                    {{ $index + 1 }}: {{ $question->id }},
-                @endforeach
-            };
+    // Question ID map
+    const questionIds = {
+        @foreach($questions as $index => $question)
+            {{ $index + 1 }}: {{ $question->id }},
+        @endforeach
+    };
+    const savedAnswersKey = 'assessment_answers_' + assessmentId;
 
-            // ============ TIMER LOGIC ============
-// ✅ RESUME FROM localStorage if available
-const savedTimeLeft = localStorage.getItem('assessment_timeLeft_' + {{ $result->id }});
-if (savedTimeLeft !== null) {
-    timeLeft = parseInt(savedTimeLeft);
-    console.log('📱 Resumed from localStorage:', timeLeft);
-}
-
-console.log('🚀 Starting/resuming timer:', timeLeft, 'seconds');
-
-function updateTimer() {
-    console.log('Timer tick:', timeLeft);
-    
-    if (timeLeft <= 0) {
-        console.log('⏰ Time expired!');
-        clearInterval(timerInterval);
-        localStorage.removeItem('assessment_timeLeft_' + {{ $result->id }});
-        autoSubmit('Time expired');
-        return;
+    // ============ CORE FUNCTIONS ============
+    function updateAnswerCount() {
+        let answered = 0;
+        for (let qNum = 1; qNum <= totalQuestions; qNum++) {
+            const questionId = questionIds[qNum];
+            const input = document.querySelector(`input[name="question_${questionId}"]:checked`);
+            const btn = document.querySelector(`.q-nav[data-q="${qNum}"]`);
+            
+            if (input) {
+                answered++;
+                if (btn && !btn.classList.contains('answered')) {
+                    btn.classList.add('answered');
+                    // Update current question styling
+                    if (btn.classList.contains('bg-blue-500')) {
+                        btn.classList.remove('bg-blue-500', 'border-blue-500', 'shadow-blue-200');
+                        btn.classList.add('bg-purple-500', 'border-purple-500', 'shadow-purple-200');
+                    }
+                }
+            } else if (btn) {
+                btn.classList.remove('answered');
+            }
+        }
+        document.getElementById('answered-count').textContent = answered;
+        const progress = Math.round((answered / totalQuestions) * 100);
+        document.getElementById('progress').style.width = `${progress}%`;
+        document.getElementById('progress-text').textContent = `${progress}%`;
+        return answered;
     }
 
-    // Update display
-    const minutes = Math.floor(timeLeft / 60);
-    const seconds = timeLeft % 60;
-    document.getElementById('timer').textContent = 
-        `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-    
-    // Save to localStorage every tick
-    localStorage.setItem('assessment_timeLeft_' + {{ $result->id }}, timeLeft);
-    
-    // Red warning at 5min
-    if (timeLeft <= 300) {
-        document.getElementById('timer').classList.add('text-red-600');
-        document.getElementById('timer').classList.remove('text-gray-900');
+
+    function saveAnswers() {
+        const answers = {};
+        for (let qNum = 1; qNum <= totalQuestions; qNum++) {
+            const questionId = questionIds[qNum];
+            const input = document.querySelector(`input[name="question_${questionId}"]:checked`);
+            if (input) answers[questionId] = input.value;
+        }
+        
+        localStorage.setItem(savedAnswersKey, JSON.stringify(answers));
+        console.log('💾 Saved', Object.keys(answers).length, 'answers');
+        
+        if (Object.keys(answers).length > 0) {
+            fetch('/assessment/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({ assessment_id: assessmentId, answers })
+            }).catch(err => console.error('Server save failed:', err));
+        }
     }
-    
-    timeLeft--;
-}
 
-// START/RESUME TIMER
-timerInterval = setInterval(updateTimer, 1000);
-updateTimer();
-console.log('✅ Timer running!');
-
-            // ============ ANTI-CHEATING ============
-            // CRITICAL 1: KEYBOARD SHORTCUTS (F12, Ctrl+S/P, DevTools)
-            document.addEventListener('keydown', e => {
-                if (e.key === 'F12' || 
-                    (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
-                    (e.ctrlKey && ['s', 'p', 'a', 'u'].includes(e.key.toLowerCase())) ||
-                    e.key === 'F5') {
-                    e.preventDefault();
-                    registerViolation('KEYBOARD_SHORTCUT');  // 🚨 CRITICAL
-                }
-            });
-
-            // CRITICAL 2: COPY/PASTE/CUT
-            ['copy', 'cut', 'paste'].forEach(evt => {
-                document.addEventListener(evt, e => {
-                    e.preventDefault();
-                    registerViolation(`${evt.toUpperCase()}_ATTEMPT`);  // 🚨 CRITICAL
-                });
-            });
-
-            // CRITICAL 3: TAB SWITCH
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    registerViolation('TAB_SWITCHED');  // 🚨 CRITICAL
-                }
-            });
-
-            // ============ SILENT BLOCKS (No log/count) ============
-            // Mouse actions - block only
-            document.addEventListener('selectstart', e => e.preventDefault());
-            document.addEventListener('mouseup', () => {
-                const selection = window.getSelection();
-                if (selection.toString().length > 0) {
-                    selection.removeAllRanges();
-                }
-            });
-            document.addEventListener('contextmenu', e => e.preventDefault());
-
-            // ============ QUESTION NAVIGATION ============
-            function showQuestion(num) {
-                document.querySelectorAll('.question').forEach(q => q.classList.add('hidden'));
-                document.querySelector(`[data-q-num="${num}"]`).classList.remove('hidden');
-                
-                document.querySelectorAll('.q-nav').forEach(btn => {
-                    const btnNum = parseInt(btn.dataset.q);
-                    const isAnswered = btn.classList.contains('answered');
-                    
-                    btn.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-white', 'text-white', 'text-gray-600', 'border-blue-500', 'border-purple-500', 'border-green-500', 'border-gray-300', 'shadow-lg', 'shadow-blue-200', 'shadow-purple-200');
-                    
-                    if (btnNum === num) {
-                        if (isAnswered) {
-                            btn.classList.add('bg-purple-500', 'text-white', 'border-purple-500', 'shadow-lg', 'shadow-purple-200');
-                        } else {
-                            btn.classList.add('bg-blue-500', 'text-white', 'border-blue-500', 'shadow-lg', 'shadow-blue-200');
-                        }
-                    } else if (isAnswered) {
-                        btn.classList.add('bg-green-500', 'text-white', 'border-green-500');
-                    } else {
-                        btn.classList.add('bg-white', 'text-gray-600', 'border-gray-300');
-                    }
-                });
-                
-                currentQuestion = num;
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-
-            document.querySelectorAll('.q-nav').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    showQuestion(parseInt(btn.dataset.q));
-                });
-            });
-
-            document.querySelectorAll('.prev-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (currentQuestion > 1) showQuestion(currentQuestion - 1);
-                });
-            });
-
-            document.querySelectorAll('.next-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (currentQuestion < totalQuestions) showQuestion(currentQuestion + 1);
-                });
-            });
-
-            function registerViolation(reason, extraData = {}) {
-                violations++;
-                
-                // 🚀 LOG TO SERVER (DB)
-                fetch('/assessment/log-violation', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({
-                        assessment_id: assessmentId,
-                        violation_type: reason,
-                        details: extraData
-                    })
-                }).catch(err => console.error('Log failed:', err));
-                
-                // UI Warning
-                const warningEl = document.getElementById('violation-warning');
-                const countEl = document.getElementById('violation-count');
-                warningEl.classList.remove('hidden');
-                countEl.textContent = violations;
-                
-                console.warn('🚨 VIOLATION:', reason, 'Total:', violations);
-                
-                if (violations >= MAX_VIOLATIONS) {
-                    setTimeout(() => autoSubmit(`3 violations: ${reason}`), 1000);
-                }
-            }
-
-
-            // ============ ANSWER TRACKING ============
-            function updateAnswerCount() {
-                let answered = 0;
-
-                for (let qNum = 1; qNum <= totalQuestions; qNum++) {
-                    const questionId = questionIds[qNum];
-                    const input = document.querySelector(`input[name="question_${questionId}"]:checked`);
-                    const btn = document.querySelector(`.q-nav[data-q="${qNum}"]`);
-
-                    if (input) {
-                        answered++;
-                        if (!btn.classList.contains('answered')) {
-                            btn.classList.add('answered');
-                            const isCurrent = btn.classList.contains('bg-blue-500') || btn.classList.contains('bg-purple-500');
-                            if (isCurrent) {
-                                btn.classList.remove('bg-blue-500', 'border-blue-500', 'shadow-blue-200');
-                                btn.classList.add('bg-purple-500', 'border-purple-500', 'shadow-purple-200');
-                            }
-                        }
-                    } else {
-                        btn.classList.remove('answered');
-                    }
-                }
-
-                // ✅ UPDATE COUNTS
-                document.getElementById('answered-count').textContent = answered;
-
-                // ✅ QUESTION-BASED PROGRESS
-                const progress = Math.round((answered / totalQuestions) * 100);
-                document.getElementById('progress').style.width = `${progress}%`;
-                document.getElementById('progress-text').textContent = `${progress}%`;
-
-                return answered;
-            }
-
-
-            document.querySelectorAll('input[type="radio"]').forEach(input => {
-                input.addEventListener('change', function() {
-                    this.closest('.question').querySelectorAll('.option-label').forEach(label => {
-                        label.classList.remove('border-blue-500', 'bg-blue-50');
-                        label.classList.add('border-gray-200');
-                    });
-                    
-                    const parentLabel = this.closest('.option-label');
-                    parentLabel.classList.remove('border-gray-200');
-                    parentLabel.classList.add('border-blue-500', 'bg-blue-50');
-                    
-                    updateAnswerCount();
-                });
-            });
-
-            // ============ AUTO-SAVE ============
-            function saveAnswers() {
-                const answers = {};
-                
-                for (let qNum = 1; qNum <= totalQuestions; qNum++) {
-                    const questionId = questionIds[qNum];
-                    const input = document.querySelector(`input[name="question_${questionId}"]:checked`);
-                    if (input) {
-                        answers[questionId] = input.value;
-                    }
-                }
-                
-                fetch('/assessment/save', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({
-                        assessment_id: assessmentId,
-                        answers: answers
-                    })
-                }).catch(err => console.error('Save failed:', err));
-            }
-
-            setInterval(saveAnswers, 10000);
-
-            // ============ SUBMISSION ============
-            function showConfirmModal() {
-                const answered = updateAnswerCount();
-                document.getElementById('confirm-answered').textContent = answered;
-                document.getElementById('confirm-unanswered').textContent = totalQuestions - answered;
-                document.getElementById('confirm-modal').classList.remove('hidden');
-            }
-
-            function hideConfirmModal() {
-                document.getElementById('confirm-modal').classList.add('hidden');
-            }
-
-            function submitAssessment() {
-                if (isSubmitting) return;
-                isSubmitting = true;
-                
-                clearInterval(timerInterval);
-                saveAnswers();
-                
-                document.body.innerHTML = `
-                    <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
-                        <div class="bg-white p-12 rounded-3xl shadow-2xl text-center max-w-md mx-auto">
-                            <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                </svg>
-                            </div>
-                            <h2 class="text-2xl font-bold text-gray-800 mb-4">Assessment Submitted!</h2>
-                            <p class="text-gray-600">Redirecting to results...</p>
-                        </div>
-                    </div>
-                `;
-                
-                setTimeout(() => {
-                    window.location.href = '/assessment/results/' + assessmentId;
-                }, 2000);
-            }
-
-            function autoSubmit(reason) {
-                alert(`Assessment auto-submitted: ${reason}`);
-                submitAssessment();
-            }
-
-            const submitBtn = document.getElementById('submit-btn');
-            if (submitBtn) {
-                submitBtn.addEventListener('click', showConfirmModal);
-            }
+    function restoreAnswers() {
+        console.log('🔍 localStorage:', localStorage.getItem(savedAnswersKey));
+        const savedAnswers = JSON.parse(localStorage.getItem(savedAnswersKey) || '{}');
+        console.log('🔍 Found:', Object.keys(savedAnswers).length, 'answers');
+        
+        Object.keys(savedAnswers).forEach(questionIdStr => {
+            const questionId = parseInt(questionIdStr);
+            const value = savedAnswers[questionIdStr];
+            const input = document.querySelector(`input[name="question_${questionId}"][value="${value}"]`);
             
-            document.getElementById('confirm-submit').addEventListener('click', () => {
-                hideConfirmModal();
-                submitAssessment();
-            });
-            
-            document.getElementById('cancel-submit').addEventListener('click', hideConfirmModal);
-
-            // ============ INITIALIZE ============
-            updateAnswerCount();
-            
-            window.addEventListener('beforeunload', (e) => {
-                if (!isSubmitting) {
-                    e.preventDefault();
-                    e.returnValue = '';
-                }
-            });
-
-            document.querySelectorAll('input[type="radio"]:checked').forEach(input => {
-                const parentLabel = input.closest('.option-label');
-                parentLabel.classList.remove('border-gray-200');
-                parentLabel.classList.add('border-blue-500', 'bg-blue-50');
-            });
+            if (input) {
+                input.checked = true;
+                const label = input.closest('.option-label');
+                label?.classList.remove('border-gray-200');
+                label?.classList.add('border-blue-500', 'bg-blue-50');
+                console.log(`✅ Restored Q${questionId}: ${value}`);
+            }
         });
-        </script>
-    </body>
-    </html>
+        
+        setTimeout(updateAnswerCount, 100);
+        console.log('🎉 Restore complete');
+    }
+
+    // ============ 1. RESTORE ANSWERS ============
+    restoreAnswers();
+
+    // ============ 2. TIMER ============
+    const savedTimeLeft = localStorage.getItem('assessment_timeLeft_' + assessmentId);
+    if (savedTimeLeft !== null) {
+        timeLeft = parseInt(savedTimeLeft);
+        console.log('📱 Timer resumed:', timeLeft);
+    }
+
+    function updateTimer() {
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            localStorage.removeItem('assessment_timeLeft_' + assessmentId);
+            autoSubmit('Time expired');
+            return;
+        }
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        document.getElementById('timer').textContent = 
+            `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+        localStorage.setItem('assessment_timeLeft_' + assessmentId, timeLeft);
+        if (timeLeft <= 300) {
+            document.getElementById('timer').classList.add('text-red-600');
+            document.getElementById('timer').classList.remove('text-gray-900');
+        }
+        timeLeft--;
+    }
+    timerInterval = setInterval(updateTimer, 1000);
+    updateTimer();
+
+    // ============ 3. NAVIGATION ============
+    function showQuestion(num) {
+        document.querySelectorAll('.question').forEach(q => q.classList.add('hidden'));
+        document.querySelector(`[data-q-num="${num}"]`).classList.remove('hidden');
+        
+        document.querySelectorAll('.q-nav').forEach(btn => {
+            const btnNum = parseInt(btn.dataset.q);
+            const isAnswered = btn.classList.contains('answered');
+            btn.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-white', 
+                              'text-white', 'text-gray-600', 'border-blue-500', 'border-purple-500', 
+                              'border-green-500', 'border-gray-300', 'shadow-lg', 'shadow-blue-200', 'shadow-purple-200');
+            if (btnNum === num) {
+                // CURRENT QUESTION
+                if (isAnswered) {
+                    // Current + Answered = PURPLE
+                    btn.classList.add('bg-purple-500', 'text-white', 'border-purple-500', 'shadow-lg', 'shadow-purple-200');
+                } else {
+                    // Current only = BLUE
+                    btn.classList.add('bg-blue-500', 'text-white', 'border-blue-500', 'shadow-lg', 'shadow-blue-200');
+                }
+            } else if (isAnswered) {
+                // Other Answered = GREEN
+                btn.classList.add('bg-green-500', 'text-white', 'border-green-500');
+            } else {
+                // Unanswered = GRAY
+                btn.classList.add('bg-white', 'text-gray-600', 'border-gray-300');
+            }
+    });
+    
+    currentQuestion = num;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+    // Navigation listeners
+    document.querySelectorAll('.q-nav').forEach(btn => {
+        btn.addEventListener('click', () => showQuestion(parseInt(btn.dataset.q)));
+    });
+    document.querySelectorAll('.prev-btn').forEach(btn => {
+        btn.addEventListener('click', () => currentQuestion > 1 && showQuestion(currentQuestion - 1));
+    });
+    document.querySelectorAll('.next-btn').forEach(btn => {
+        btn.addEventListener('click', () => currentQuestion < totalQuestions && showQuestion(currentQuestion + 1));
+    });
+
+    // ============ 4. RADIO BUTTONS ============
+    document.querySelectorAll('input[type="radio"]').forEach(input => {
+        input.addEventListener('change', function() {
+            this.closest('.question').querySelectorAll('.option-label').forEach(label => {
+                label.classList.remove('border-blue-500', 'bg-blue-50');
+                label.classList.add('border-gray-200');
+            });
+            const label = this.closest('.option-label');
+            label.classList.remove('border-gray-200');
+            label.classList.add('border-blue-500', 'bg-blue-50');
+            updateAnswerCount();
+            saveAnswers(); // IMMEDIATE SAVE
+        });
+    });
+
+    // ============ 5. ANTI-CHEAT ============
+    function registerViolation(reason) {
+        violations++;
+        fetch('/assessment/log-violation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+            body: JSON.stringify({ assessment_id: assessmentId, violation_type: reason })
+        }).catch(console.error);
+        
+        const warningEl = document.getElementById('violation-warning');
+        const countEl = document.getElementById('violation-count');
+        warningEl.classList.remove('hidden');
+        countEl.textContent = violations;
+        console.warn('🚨 VIOLATION:', reason);
+        if (violations >= MAX_VIOLATIONS) setTimeout(() => autoSubmit(`3 violations: ${reason}`), 1000);
+    }
+            //     document.addEventListener('keydown', e => {
+            //     if (e.key === 'F12' || 
+            //         (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
+            //         (e.ctrlKey && ['s', 'p', 'a', 'u'].includes(e.key.toLowerCase())) ||
+            //         e.key === 'F5') {
+            //         e.preventDefault();
+            //         registerViolation('KEYBOARD_SHORTCUT');  // 🚨 CRITICAL
+            //     }
+            // });
+
+    ['copy', 'cut', 'paste'].forEach(evt => {
+        document.addEventListener(evt, e => { e.preventDefault(); registerViolation(`${evt.toUpperCase()}_ATTEMPT`); });
+    });
+    document.addEventListener('visibilitychange', () => document.hidden && registerViolation('TAB_SWITCHED'));
+    document.addEventListener('selectstart', e => e.preventDefault());
+    document.addEventListener('mouseup', () => window.getSelection()?.removeAllRanges());
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    // ============ 6. SUBMIT ============
+    function showConfirmModal() {
+        const answered = updateAnswerCount();
+        document.getElementById('confirm-answered').textContent = answered;
+        document.getElementById('confirm-unanswered').textContent = totalQuestions - answered;
+        document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function submitAssessment() {
+        if (isSubmitting) return;
+        isSubmitting = true;
+        localStorage.removeItem('assessment_timeLeft_' + assessmentId);
+        localStorage.removeItem(savedAnswersKey);
+        clearInterval(timerInterval);
+        saveAnswers();
+        
+        document.body.innerHTML = `
+            <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
+                <div class="bg-white p-12 rounded-3xl shadow-2xl text-center max-w-md mx-auto">
+                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Assessment Submitted!</h2>
+                    <p class="text-gray-600">Redirecting to results...</p>
+                </div>
+            </div>
+        `;
+        setTimeout(() => window.location.href = '/assessment/results/' + assessmentId, 2000);
+    }
+
+    function autoSubmit(reason) {
+        alert(`Assessment auto-submitted: ${reason}`);
+        submitAssessment();
+    }
+
+    // Event listeners
+    document.getElementById('submit-btn')?.addEventListener('click', showConfirmModal);
+    document.getElementById('confirm-submit')?.addEventListener('click', () => { 
+        document.getElementById('confirm-modal').classList.add('hidden'); 
+        submitAssessment(); 
+    });
+    document.getElementById('cancel-submit')?.addEventListener('click', () => {
+        document.getElementById('confirm-modal').classList.add('hidden');
+    });
+
+    // ============ 7. AUTO-SAVE + INIT ============
+    setInterval(saveAnswers, 10000); // EVERY 10s
+    window.addEventListener('beforeunload', e => !isSubmitting && (e.preventDefault(), e.returnValue = ''));
+    
+    console.log('🚀 Assessment ready!');
+});
+</script>

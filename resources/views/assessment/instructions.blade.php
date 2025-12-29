@@ -4,220 +4,225 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Assessment Instructions - {{ $assessment->name }}</title>
+    <title>Instructions - {{ $assessment->name }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
-            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.8); }
-        }
-        .pulse-glow { animation: pulse-glow 2s infinite; }
-    </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen py-8">
-    <div class="container mx-auto px-4 max-w-5xl">
-        <!-- HEADER -->
-        <div class="text-center mb-16">
-            <div class="w-28 h-28 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl border-4 border-white/50">
-                <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                </svg>
-            </div>
-            <h1 class="text-5xl md:text-6xl font-black bg-gradient-to-r from-gray-900 via-gray-700 to-gray-500 bg-clip-text text-transparent mb-6 leading-tight">
-                Assessment Instructions
-            </h1>
-            <p class="text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-                Read carefully. 2 minutes reading time. Your assessment starts after.
-            </p>
-        </div>
-
-        <!-- INSTRUCTION TIMER -->
-        <div class="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-10 mb-16 border border-white/60 max-w-2xl mx-auto">
-            <div class="text-center">
-                <div class="text-6xl font-black text-blue-600 mb-4 font-mono tracking-wider" id="instructionTimer">2:00</div>
-                <div class="text-2xl font-semibold text-gray-700">Reading time remaining</div>
-                <div class="text-lg text-blue-600 font-medium mt-2" id="statusText">Take your time to read</div>
-            </div>
-        </div>
-
-        <!-- ASSESSMENT INFO -->
-        <div class="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-3xl shadow-xl p-10 mb-16 border border-emerald-200">
-            <h2 class="text-3xl font-bold text-emerald-800 mb-8 text-center">📋 Assessment Details</h2>
-            <div class="grid md:grid-cols-2 gap-8 text-xl">
-                <div class="space-y-4">
-                    <div class="flex items-center p-4 bg-white rounded-2xl shadow-sm">
-                        <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mr-4">
-                            <span class="text-2xl font-bold text-emerald-600">⏱️</span>
-                        </div>
-                        <div>
-                            <div class="font-bold text-gray-900 text-2xl">{{ $assessment->duration_minutes }} minutes</div>
-                            <div class="text-gray-600">Total time</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center p-4 bg-white rounded-2xl shadow-sm">
-                        <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mr-4">
-                            <span class="text-2xl font-bold text-blue-600">❓</span>
-                        </div>
-                        <div>
-                            <div class="font-bold text-gray-900 text-2xl">20 Questions</div>
-                            <div class="text-gray-600">Multiple choice</div>
-                        </div>
-                    </div>
+<body class="bg-gray-50">
+    
+    <!-- Header -->
+    <div class="bg-white border-b border-gray-200 shadow-sm">
+        <div class="container mx-auto px-6 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">{{ $assessment->name }}</h1>
+                    <p class="text-gray-600 mt-1">Please read the instructions carefully before starting</p>
                 </div>
-                <div class="space-y-4">
-                    <div class="flex items-center p-4 bg-white rounded-2xl shadow-sm">
-                        <div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center mr-4">
-                            <span class="text-2xl font-bold text-amber-600">🎯</span>
-                        </div>
-                        <div>
-                            <div class="font-bold text-gray-900 text-2xl">{{ $assessment->pass_percentage }}%</div>
-                            <div class="text-gray-600">Required to pass</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center p-4 bg-white rounded-2xl shadow-sm">
-                        <div class="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center mr-4">
-                            <span class="text-2xl font-bold text-purple-600">💾</span>
-                        </div>
-                        <div>
-                            <div class="font-bold text-gray-900 text-2xl">Auto-save</div>
-                            <div class="text-gray-600">Every 10 seconds</div>
-                        </div>
-                    </div>
+                <div class="text-right">
+                    <div class="text-sm text-gray-500">Time to read</div>
+                    <div class="text-3xl font-bold text-gray-900" id="timer">2:00</div>
                 </div>
             </div>
-        </div>
-
-        <!-- RULES -->
-        <div class="grid lg:grid-cols-2 gap-12 mb-20">
-            <!-- DO's -->
-            <div class="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border-4 border-green-100 hover:border-green-200 transition-all duration-300 group">
-                <h2 class="text-4xl font-black text-green-800 mb-8 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                    <span class="w-5 h-5 bg-green-500 rounded-full mr-4 shadow-lg"></span>
-                    ✅ DO's
-                </h2>
-                <ul class="space-y-6">
-                    <li class="flex items-start group-hover:translate-x-2 transition-transform duration-300">
-                        <div class="w-10 h-10 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center font-bold text-xl mr-5 mt-1 shadow-md flex-shrink-0">✓</div>
-                        <span class="text-xl leading-relaxed text-gray-800">Answer honestly based on your actual skills</span>
-                    </li>
-                    <li class="flex items-start group-hover:translate-x-2 transition-transform duration-300">
-                        <div class="w-10 h-10 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center font-bold text-xl mr-5 mt-1 shadow-md flex-shrink-0">✓</div>
-                        <span class="text-xl leading-relaxed text-gray-800">Use only your knowledge (no external help)</span>
-                    </li>
-                    <li class="flex items-start group-hover:translate-x-2 transition-transform duration-300">
-                        <div class="w-10 h-10 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center font-bold text-xl mr-5 mt-1 shadow-md flex-shrink-0">✓</div>
-                        <span class="text-xl leading-relaxed text-gray-800">Manage your time wisely (20 questions)</span>
-                    </li>
-                    <li class="flex items-start group-hover:translate-x-2 transition-transform duration-300">
-                        <div class="w-10 h-10 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center font-bold text-xl mr-5 mt-1 shadow-md flex-shrink-0">✓</div>
-                        <span class="text-xl leading-relaxed text-gray-800">Your answers are auto-saved</span>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- DON'Ts -->
-            <div class="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border-4 border-red-100 hover:border-red-200 transition-all duration-300 group">
-                <h2 class="text-4xl font-black text-red-800 mb-8 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                    <span class="w-5 h-5 bg-red-500 rounded-full mr-4 shadow-lg"></span>
-                    ❌ DON'Ts
-                </h2>
-                <ul class="space-y-6">
-                    <li class="flex items-start group-hover:translate-x-2 transition-transform duration-300">
-                        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center font-bold text-xl mr-5 mt-1 shadow-md flex-shrink-0">✗</div>
-                        <span class="text-xl leading-relaxed text-gray-800">No Google/ChatGPT (3 violations = auto-submit)</span>
-                    </li>
-                    <li class="flex items-start group-hover:translate-x-2 transition-transform duration-300">
-                        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center font-bold text-xl mr-5 mt-1 shadow-md flex-shrink-0">✗</div>
-                        <span class="text-xl leading-relaxed text-gray-800">No tab switching (violation detected)</span>
-                    </li>
-                    <li class="flex items-start group-hover:translate-x-2 transition-transform duration-300">
-                        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center font-bold text-xl mr-5 mt-1 shadow-md flex-shrink-0">✗</div>
-                        <span class="text-xl leading-relaxed text-gray-800">Don't refresh/close during test</span>
-                    </li>
-                    <li class="flex items-start group-hover:translate-x-2 transition-transform duration-300">
-                        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center font-bold text-xl mr-5 mt-1 shadow-md flex-shrink-0">✗</div>
-                        <span class="text-xl leading-relaxed text-gray-800">No copy/paste/right-click allowed</span>
-                    </li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- START BUTTON -->
-        <div class="text-center">
-            <button id="startAssessment" 
-                    class="px-16 py-8 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white text-2xl font-black rounded-3xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-2 transition-all duration-500 inline-flex items-center text-lg tracking-wide pulse-glow">
-                <svg class="w-8 h-8 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
-                🚀 START ASSESSMENT NOW
-            </button>
-            <p class="text-lg text-gray-600 mt-6 font-medium">Click to begin your {{ $assessment->duration_minutes }}-minute assessment</p>
         </div>
     </div>
 
+    <!-- Main Content -->
+    <div class="container mx-auto px-6 py-8 max-w-4xl">
+        
+        <!-- Assessment Details -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Assessment Details</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                    <div class="mr-4">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600">Duration</div>
+                        <div class="text-lg font-bold text-gray-900">{{ $assessment->duration_minutes }} minutes</div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                    <div class="mr-4">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600">Questions</div>
+                        <div class="text-lg font-bold text-gray-900">20 Questions</div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                    <div class="mr-4">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600">Passing Score</div>
+                        <div class="text-lg font-bold text-gray-900">{{ $assessment->pass_percentage }}%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Instructions</h2>
+            <div class="space-y-4 text-gray-700">
+                <div class="flex items-start">
+                    <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm mr-3 mt-0.5">1</span>
+                    <p>The assessment consists of 20 multiple-choice questions based on your resume skills.</p>
+                </div>
+                <div class="flex items-start">
+                    <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm mr-3 mt-0.5">2</span>
+                    <p>You have {{ $assessment->duration_minutes }} minutes to complete all questions. The timer will start as soon as you begin.</p>
+                </div>
+                <div class="flex items-start">
+                    <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm mr-3 mt-0.5">3</span>
+                    <p>Each question has multiple options. Select the most appropriate answer.</p>
+                </div>
+                <div class="flex items-start">
+                    <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm mr-3 mt-0.5">4</span>
+                    <p>You can navigate between questions using the Previous and Next buttons, or by clicking question numbers in the navigator.</p>
+                </div>
+                <div class="flex items-start">
+                    <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm mr-3 mt-0.5">5</span>
+                    <p>Your answers are automatically saved every 10 seconds.</p>
+                </div>
+                <div class="flex items-start">
+                    <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 font-semibold text-sm mr-3 mt-0.5">6</span>
+                    <p>Once you submit, you cannot change your answers. Make sure to review before submitting.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Important Rules -->
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+            <!-- Allowed -->
+            <div class="bg-green-50 rounded-lg border border-green-200 p-6">
+                <h3 class="text-lg font-bold text-green-900 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    You Should
+                </h3>
+                <ul class="space-y-2 text-green-900">
+                    <li class="flex items-start">
+                        <span class="mr-2">•</span>
+                        <span>Read each question carefully</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="mr-2">•</span>
+                        <span>Manage your time effectively</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="mr-2">•</span>
+                        <span>Answer all questions if possible</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="mr-2">•</span>
+                        <span>Review your answers before submitting</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Not Allowed -->
+            <div class="bg-red-50 rounded-lg border border-red-200 p-6">
+                <h3 class="text-lg font-bold text-red-900 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    </svg>
+                    Not Allowed
+                </h3>
+                <ul class="space-y-2 text-red-900">
+                    <li class="flex items-start">
+                        <span class="mr-2">•</span>
+                        <span>Using external resources (Google, ChatGPT, etc.)</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="mr-2">•</span>
+                        <span>Switching tabs or windows</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="mr-2">•</span>
+                        <span>Taking help from others</span>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="mr-2">•</span>
+                        <span>Refreshing or closing the browser</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Warning Notice -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700 font-semibold">
+                        Important: The system monitors for violations. Three violations will result in automatic submission of your assessment.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Button -->
+        <div class="text-center">
+            <button id="startBtn" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-12 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all duration-200">
+                Start Assessment Now
+            </button>
+            <p class="text-gray-600 mt-4" id="startHint">Click when you're ready to begin</p>
+        </div>
+
+    </div>
+
     <script>
-    let instructionTime = 120; // 2 minutes
-    const assessmentId = {{ $assessment->id ?? 1 }};
-    
-    function updateInstructionTimer() {
-        const minutes = Math.floor(instructionTime / 60);
-        const seconds = instructionTime % 60;
-        document.getElementById('instructionTimer').textContent = 
-            `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        
-        const statusEl = document.getElementById('statusText');
-        const startBtn = document.getElementById('startAssessment');
-        
-        if (instructionTime <= 30) {
-            statusEl.textContent = 'Time almost up! Ready to start?';
-            statusEl.className = 'text-2xl font-semibold text-red-600 mt-2';
-            startBtn.classList.add('animate-pulse');
-        } else if (instructionTime <= 60) {
-            statusEl.textContent = 'Halfway through. Keep reading!';
-            statusEl.className = 'text-2xl font-semibold text-amber-600 mt-2';
+        let readTime = 120; // 2 minutes
+        const timerEl = document.getElementById('timer');
+        const startBtn = document.getElementById('startBtn');
+        const startHint = document.getElementById('startHint');
+
+        function updateTimer() {
+            const minutes = Math.floor(readTime / 60);
+            const seconds = readTime % 60;
+            timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (readTime <= 0) {
+                timerEl.textContent = '0:00';
+                return;
+            }
+
+            if (readTime <= 30) {
+                timerEl.classList.add('text-orange-600');
+            }
+
+            readTime--;
         }
-        
-        if (instructionTime <= 0) {
-            startBtn.innerHTML = `
-                <svg class="w-8 h-8 mr-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v2m8 6h-2m-8 6v-2M4 12H2m15.364-5.636l-.707.707M6.343 17.657l-.707-.707"/>
-                </svg>
-                STARTING IN 5 SECONDS...
-            `;
+
+        // Update timer every second
+        setInterval(updateTimer, 1000);
+        updateTimer();
+
+        // Start button click
+        startBtn.addEventListener('click', function() {
+            this.disabled = true;
+            this.innerHTML = '<svg class="animate-spin h-5 w-5 mr-3 inline-block" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Starting...';
+            
             setTimeout(() => {
                 window.location.href = '/assessment/start';
-            }, 5000);
-            return;
-        }
-        instructionTime--;
-    }
-    
-    // Start instruction timer
-    setInterval(updateInstructionTimer, 1000);
-    updateInstructionTimer();
-    
-    // Manual start button
-    document.getElementById('startAssessment').onclick = function(e) {
-        e.preventDefault();
-        this.innerHTML = `
-            <svg class="w-8 h-8 mr-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v2m8 6h-2m-8 6v-2M4 12H2m15.364-5.636l-.707.707M6.343 17.657l-.707-.707"/>
-            </svg>
-            STARTING SOON...
-        `;
-        setTimeout(() => {
-            window.location.href = '/assessment/start';
-        }, 1000);
-    };
-    
-    // Prevent right-click, F12, etc.
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('keydown', e => {
-        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
-            e.preventDefault();
-        }
-    });
+            }, 1000);
+        });
     </script>
 </body>
 </html>

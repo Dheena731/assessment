@@ -52,8 +52,9 @@ Route::middleware(['auth', 'nocache'])->group(function () {
         Route::post('/assessment/save', [AssessmentController::class, 'save'])->name('assessment.save');
         Route::get('/assessment/results/{userAssessment}', [AssessmentController::class, 'results'])->name('assessment.results');
         Route::post('/assessment/log-violation', [AssessmentController::class, 'logViolation']);
-
-    
+        Route::get('/assessment/{id}/download-report', [AssessmentController::class, 'downloadReport'])
+        ->name('assessment.download-report');
+        
 
 });
 

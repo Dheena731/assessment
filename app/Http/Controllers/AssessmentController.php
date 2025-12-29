@@ -7,6 +7,7 @@
     use App\Models\UserAssessment;
     use Illuminate\Http\Request;
     use Illuminate\Support\Facades\Auth;
+    use Barryvdh\DomPDF\Facade\Pdf;
 
     class AssessmentController extends Controller
     {
@@ -223,7 +224,28 @@ public function logViolation(Request $request)
             
             return view('assessment.results', compact('userAssessment', 'assessment', 'percentage', 'isPassed'));
         }
+        public function downloadReport($id)
+        {
+            $userAssessment = UserAssessment::with(['assessment'])->findOrFail($id);
+            $assessment = $userAssessment->assessment;
+            
+            // Calculate from existing data (no special relations needed)
+            $totalQuestions = $userAssessment->total_questions ?? count($userAssessment->questions ?? []);
+            $score = $userAssessment->score ?? 0;
+            $percentage = $totalQuestions > 0 ? round(($score / $totalQuestions) * 100, 1) : 0;
+            $isPassed = $percentage >= $assessment->pass_percentage;
+            
+            // Pass user for PDF header
+            $user = Auth::user();
 
+            $pdf = Pdf::loadView('pdf.report', compact(
+                'userAssessment', 'assessment', 'totalQuestions', 
+                'score', 'percentage', 'isPassed', 'user'
+            ));
+            
+            $filename = 'Assessment-Report-' . $user->name . '-' . now()->format('Y-m-d') . '.pdf';
+            return $pdf->download($filename);
+        }
         public function calculateScore($userAssessment)
         {
             $score = 0;
