@@ -1,209 +1,569 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Assessment - {{ floor($timeLeft / 60) }}:{{ str_pad($timeLeft % 60, 2, '0', STR_PAD_LEFT) }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .timer-container { text-align: center; margin: 20px 0; }
-        .progress-bar { width: 100%; height: 10px; background: #e0e0e0; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
-        #progress { height: 100%; background: linear-gradient(90deg, #ff6b6b, #4ecdc4); transition: width 0.3s ease; }
-        .timer { font-size: 2.5em; font-weight: bold; color: #333; }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen p-8">
-    <div class="container mx-auto max-w-4xl">
-        <div class="bg-white rounded-xl shadow-2xl p-8">
-            <!-- HEADER + SERVER TIMER -->
-            <div class="flex justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold text-gray-800">
-                    {{ $assessment->name }}
-                </h1>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+        <title>{{ $assessment->name }} - Assessment</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-50">
+        
+<!-- TOP HEADER BAR WITH LOGOUT -->
+<div class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <div class="container mx-auto px-6 py-4">
+        <div class="flex justify-between items-center">
+            <!-- LEFT: Title -->
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">{{ $assessment->name }}</h1>
+                <p class="text-sm text-gray-500 mt-1">Answer all questions before submitting</p>
+            </div>
+            
+            <!-- RIGHT: Timer + Logout -->
+            <div class="flex items-center space-x-4">
+                <!-- TIMER -->
                 <div class="text-right">
-                    <div class="text-3xl font-bold text-red-600" id="timer">
+                    <div class="text-sm text-gray-500 mb-1">Time Remaining</div>
+                    <div class="text-3xl font-bold text-gray-900" id="timer">
                         {{ floor($timeLeft / 60) }}:{{ str_pad($timeLeft % 60, 2, '0', STR_PAD_LEFT) }}
                     </div>
-                    <div class="text-sm text-gray-500">
-                        {{ $assessment->duration_minutes }} minutes total
-                    </div>
                 </div>
-            </div>
-
-            <!-- SERVER-SYNC PROGRESS BAR -->
-            <div class="mb-6">
-                <div class="progress-bar">
-                    <div id="progress" style="width: {{ (($assessment->duration_minutes * 60 - $timeLeft) / ($assessment->duration_minutes * 60)) * 100 }}%"></div>
-                </div>
-                <div class="text-sm text-gray-500 mt-1">
-                    Question <span id="current-q">1</span> of {{ $questions->count() }}
-                </div>
-            </div>
-
-            <!-- QUESTIONS -->
-            <form id="assessment-form">
-                @foreach($questions as $index => $question)
-                <div class="question border-l-4 border-blue-500 pl-6 py-6 mb-4 bg-gray-50 rounded-lg" 
-                     data-question-id="{{ $question->id }}"
-                     data-hint="{{ $question->hint ?? 'Think carefully!' }}">
-                    <div class="font-semibold text-lg mb-3">
-                        Q{{ $index + 1 }}. {{ $question->question }}
-                        @if($question->hint)
-                        <button type="button" class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full hover:bg-yellow-200 hint-btn">
-                            💡 Hint
+                
+                <!-- LOGOUT BUTTON -->
+                <div class="flex flex-col items-end">
+                    <form method="POST" action="{{ route('logout') }}" class="inline">
+                        @csrf
+                        <button type="submit" 
+                                class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow-md flex items-center space-x-1"
+                                onclick="return confirm('⚠️ Logout will END your assessment!\nContinue answering or submit first.\n\nReally logout?')">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7"></path>
+                            </svg>
+                            <span>Logout</span>
                         </button>
-                        @endif
-                    </div>
-
-                    @foreach($question->options->sortBy('order') as $option)
-                    <label class="flex items-center p-3 mb-2 hover:bg-white rounded-lg cursor-pointer transition-all option-label">
-                        <input type="radio" 
-                               name="question_{{ $question->id }}" 
-                               value="{{ $option->order }}"
-                               class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 mr-3"
-                               {{ old("question_{$question->id}") == $option->order ? 'checked' : '' }}>
-                        <span class="text-sm font-medium text-gray-700">
-                            {{ chr(64 + $option->order) }}. {{ $option->option_text }}
-                        </span>
-                    </label>
-                    @endforeach
-                </div>
-                @endforeach
-
-                <!-- SUBMIT BUTTON -->
-                <div class="flex justify-between pt-6 border-t">
-                    <button type="button" id="submit-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-xl text-lg transition-all">
-                        ⏰ Submit Assessment
-                    </button>
-                    <div class="text-sm text-gray-500 self-center">
-                        Need {{ $assessment->pass_percentage }}% to pass
-                    </div>
-                </div>
-            </form>
-
-            <!-- HINT MODAL -->
-            <div id="hint-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
-                <div class="bg-white p-6 rounded-xl max-w-md w-full max-h-96 overflow-y-auto">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-bold text-gray-800">💡 Hint</h3>
-                        <button id="close-hint" class="text-2xl font-bold text-gray-500 hover:text-gray-700">&times;</button>
-                    </div>
-                    <div id="hint-content" class="text-gray-800 text-sm leading-relaxed"></div>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
-
-    <input type="hidden" id="user-assessment-id" value="{{ $userAssessment->id }}">
-
-    <!-- 🎯 PRODUCTION SERVER-SYNC TIMER -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        let timeLeft = {{ $timeLeft }};  // 🎯 SERVER TIME!
-        let timerInterval;
-        const assessmentId = {{ $userAssessment->id }};
-        const totalDuration = {{ $assessment->duration_minutes * 60 }};
         
-        function updateTimer() {
-            if (timeLeft <= 0) {
-                clearInterval(timerInterval);
-                submitAssessment();
-                return;
-            }
-            
-            // 🔄 SERVER SYNC every 30s
-            if (timeLeft % 30 === 0 && timeLeft > 0) {
-                fetch(`/assessment/time-sync/${assessmentId}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.timeLeft !== undefined) {
-                            timeLeft = data.timeLeft;
-                        }
-                    }).catch(() => {}); // Silent fail
-            }
-            
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            document.getElementById('timer').textContent = 
-                `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-            
-            const progress = ((totalDuration - timeLeft) / totalDuration) * 100;
-            document.getElementById('progress').style.width = `${progress}%`;
-            
-            timeLeft--;
-        }
-        
-        // AUTO-SAVE ANSWERS
-        function saveAnswers() {
-            const answers = {};
-            document.querySelectorAll('input[type="radio"]:checked').forEach(input => {
-                const qId = input.name.replace('question_', '');
-                answers[qId] = input.value;
-            });
-            
-            fetch('/assessment/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                },
-                body: JSON.stringify({
-                    assessment_id: assessmentId,
-                    answers: answers
-                })
-            });
-        }
-        
-        // SUBMIT
-        function submitAssessment() {
-            saveAnswers();
-            document.body.innerHTML = `
-                <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
-                    <div class="bg-white p-12 rounded-3xl shadow-2xl text-center max-w-md mx-auto">
-                        <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                        </div>
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Submitting Assessment...</h2>
-                        <p class="text-gray-600">Redirecting to results</p>
+                <!-- Progress Bar -->
+                <div class="mt-4">
+                    <div class="flex justify-between text-xs text-gray-600 mb-2">
+                        <span>Progress: <span id="answered-count" class="font-bold text-blue-600">0</span> / {{ $questions->count() }}</span>
+                        <span id="progress-text">0%</span>
+                    </div>
+                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div id="progress" class="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300" style="width: 0%"></div>
                     </div>
                 </div>
-            `;
-            setTimeout(() => {
-                window.location.href = '/assessment/results/' + assessmentId;
-            }, 2000);
-        }
-        
-        // INIT
-        timerInterval = setInterval(updateTimer, 1000);
-        updateTimer();
-        
-        // EVENTS
-        document.getElementById('submit-btn').onclick = submitAssessment;
-        setInterval(saveAnswers, 5000); // Auto-save every 5s
-        
-        // HINTS
-        document.querySelectorAll('.hint-btn').forEach(btn => {
-            btn.onclick = function() {
-                const questionDiv = this.closest('.question');
-                const hint = questionDiv.dataset.hint;
-                document.getElementById('hint-content').textContent = hint;
-                document.getElementById('hint-modal').classList.remove('hidden');
+            </div>
+        </div>
+
+        <!-- VIOLATIONS WARNING -->
+        <div id="violation-warning" class="hidden">
+            <div class="container mx-auto px-6 py-3">
+                <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
+                    <div class="flex items-center">
+                        <span class="text-red-600 font-bold text-xl mr-3">⚠️</span>
+                        <span class="text-red-700 font-semibold">
+                            Warning: <span id="violation-count">0</span>/3 violations detected. 
+                            <span class="text-red-900">Assessment will auto-submit at 3 violations!</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="container mx-auto px-6 py-8">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                
+                <!-- LEFT CONTENT - Questions -->
+                <div class="lg:col-span-3">
+                    <form id="assessment-form">
+                        @foreach($questions as $index => $question)
+                            <div class="question bg-white rounded-xl shadow-sm border-2 border-gray-200 p-8 mb-6 {{ $index > 0 ? 'hidden' : '' }}" 
+                                data-q-num="{{ $index + 1 }}"
+                                data-question-id="{{ $question->id }}">
+                                
+                                <!-- Question Header -->
+                                <div class="flex items-start justify-between mb-6">
+                                    <div class="flex-1">
+                                        <div class="text-sm font-semibold text-blue-600 mb-2">Question {{ $index + 1 }} of {{ $questions->count() }}</div>
+                                        <h2 class="text-xl font-bold text-gray-900 leading-relaxed">
+                                            {{ $question->question }}
+                                        </h2>
+                                    </div>
+                                    <div class="ml-4">
+                                        <span class="inline-flex items-center justify-center w-12 h-12 bg-blue-100 text-blue-700 rounded-full font-bold text-lg">
+                                            {{ $index + 1 }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Options -->
+                                <div class="space-y-3">
+                                    @foreach($question->options->sortBy('order') as $option)
+                                        <label class="option-label flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer transition-all duration-200 hover:border-blue-400 hover:bg-blue-50">
+                                            <input type="radio" 
+                                                name="question_{{ $question->id }}" 
+                                                value="{{ $option->order }}"
+                                                class="mt-1 w-5 h-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                                                data-question-num="{{ $index + 1 }}">
+                                            <span class="ml-3 flex-1">
+                                                <span class="inline-block w-8 font-bold text-gray-700">{{ chr(64 + $option->order) }}.</span>
+                                                <span class="text-gray-800">{{ $option->option_text }}</span>
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+
+                                <!-- Navigation Buttons -->
+                                <div class="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+                                    <button type="button" 
+                                            class="prev-btn px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-all duration-200 {{ $index === 0 ? 'invisible' : '' }}">
+                                        ← Previous
+                                    </button>
+                                    
+                                    <div class="text-sm text-gray-500">
+                                        Question {{ $index + 1 }} of {{ $questions->count() }}
+                                    </div>
+
+                                    @if($index < $questions->count() - 1)
+                                        <button type="button" 
+                                                class="next-btn px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all duration-200">
+                                            Next →
+                                        </button>
+                                    @else
+                                        <button type="button" 
+                                                id="submit-btn" 
+                                                class="px-8 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all duration-200 shadow-lg">
+                                            Submit Assessment
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </form>
+                </div>
+
+                <!-- RIGHT SIDEBAR - Question Navigator -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 sticky top-24">
+                        <h3 class="font-bold text-gray-900 mb-4 text-lg">Question Navigator</h3>
+                        
+                        <!-- Legend -->
+                        <div class="mb-4 space-y-2 text-xs bg-gray-50 p-3 rounded-lg">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 bg-white border-2 border-gray-300 rounded"></div>
+                                <span class="text-gray-700">Not Answered</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 bg-green-500 border-2 border-green-500 rounded"></div>
+                                <span class="text-gray-700">Answered</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 bg-blue-500 border-2 border-blue-500 rounded shadow-lg shadow-blue-200"></div>
+                                <span class="text-gray-700">Current</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 bg-purple-500 border-2 border-purple-500 rounded shadow-lg shadow-purple-200"></div>
+                                <span class="text-gray-700">Current + Answered</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Question Buttons Grid -->
+                        <div class="grid grid-cols-4 gap-2">
+                            @foreach($questions as $index => $question)
+                                <button type="button" 
+                                        class="q-nav h-12 flex items-center justify-center font-semibold rounded-lg border-2 transition-all duration-200 {{ $index === 0 ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-200' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50' }}" 
+                                        data-q="{{ $index + 1 }}"
+                                        data-question-id="{{ $question->id }}">
+                                    {{ $index + 1 }}
+                                </button>
+                            @endforeach
+                        </div>
+
+                        <!-- Pass Info -->
+                        <div class="mt-6 pt-4 border-t border-gray-200">
+                            <div class="text-sm text-gray-600">
+                                <div class="flex justify-between mb-1">
+                                    <span>Passing Score:</span>
+                                    <span class="font-bold text-gray-900">{{ $assessment->pass_percentage }}%</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Total Questions:</span>
+                                    <span class="font-bold text-gray-900">{{ $questions->count() }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONFIRMATION MODAL -->
+        <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-3xl">⚠️</span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Confirm Submission</h3>
+                    <p class="text-gray-600">Are you sure you want to submit your assessment?</p>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-gray-600">Questions Answered:</span>
+                        <span class="font-bold text-gray-900"><span id="confirm-answered">0</span> / {{ $questions->count() }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Unanswered:</span>
+                        <span class="font-bold text-red-600" id="confirm-unanswered">{{ $questions->count() }}</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="cancel-submit" 
+                            class="flex-1 px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-all duration-200">
+                        Cancel
+                    </button>
+                    <button id="confirm-submit" 
+                            class="flex-1 px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all duration-200">
+                        Yes, Submit
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ============ STATE ============
+            let timeLeft = parseInt({{ $timeLeft }});  // ✅ Convert to integer
+            let timerInterval;
+            let violations = 0;
+            let currentQuestion = 1;
+            let isSubmitting = false;
+            const totalQuestions = {{ $questions->count() }};
+            const MAX_VIOLATIONS = 3;
+            const assessmentId = {{ $result->id }};
+
+            // Create question ID map
+            const questionIds = {
+                @foreach($questions as $index => $question)
+                    {{ $index + 1 }}: {{ $question->id }},
+                @endforeach
             };
-        });
-        
-        document.getElementById('close-hint').onclick = function() {
-            document.getElementById('hint-modal').classList.add('hidden');
-        };
-        
-        document.getElementById('hint-modal').onclick = function(e) {
-            if (e.target === this) {
-                this.classList.add('hidden');
+
+            // ============ TIMER LOGIC ============
+// ✅ RESUME FROM localStorage if available
+const savedTimeLeft = localStorage.getItem('assessment_timeLeft_' + {{ $result->id }});
+if (savedTimeLeft !== null) {
+    timeLeft = parseInt(savedTimeLeft);
+    console.log('📱 Resumed from localStorage:', timeLeft);
+}
+
+console.log('🚀 Starting/resuming timer:', timeLeft, 'seconds');
+
+function updateTimer() {
+    console.log('Timer tick:', timeLeft);
+    
+    if (timeLeft <= 0) {
+        console.log('⏰ Time expired!');
+        clearInterval(timerInterval);
+        localStorage.removeItem('assessment_timeLeft_' + {{ $result->id }});
+        autoSubmit('Time expired');
+        return;
+    }
+
+    // Update display
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    document.getElementById('timer').textContent = 
+        `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    
+    // Save to localStorage every tick
+    localStorage.setItem('assessment_timeLeft_' + {{ $result->id }}, timeLeft);
+    
+    // Red warning at 5min
+    if (timeLeft <= 300) {
+        document.getElementById('timer').classList.add('text-red-600');
+        document.getElementById('timer').classList.remove('text-gray-900');
+    }
+    
+    timeLeft--;
+}
+
+// START/RESUME TIMER
+timerInterval = setInterval(updateTimer, 1000);
+updateTimer();
+console.log('✅ Timer running!');
+
+            // ============ ANTI-CHEATING ============
+            // CRITICAL 1: KEYBOARD SHORTCUTS (F12, Ctrl+S/P, DevTools)
+            document.addEventListener('keydown', e => {
+                if (e.key === 'F12' || 
+                    (e.ctrlKey && e.shiftKey && ['I', 'C', 'J'].includes(e.key)) ||
+                    (e.ctrlKey && ['s', 'p', 'a', 'u'].includes(e.key.toLowerCase())) ||
+                    e.key === 'F5') {
+                    e.preventDefault();
+                    registerViolation('KEYBOARD_SHORTCUT');  // 🚨 CRITICAL
+                }
+            });
+
+            // CRITICAL 2: COPY/PASTE/CUT
+            ['copy', 'cut', 'paste'].forEach(evt => {
+                document.addEventListener(evt, e => {
+                    e.preventDefault();
+                    registerViolation(`${evt.toUpperCase()}_ATTEMPT`);  // 🚨 CRITICAL
+                });
+            });
+
+            // CRITICAL 3: TAB SWITCH
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    registerViolation('TAB_SWITCHED');  // 🚨 CRITICAL
+                }
+            });
+
+            // ============ SILENT BLOCKS (No log/count) ============
+            // Mouse actions - block only
+            document.addEventListener('selectstart', e => e.preventDefault());
+            document.addEventListener('mouseup', () => {
+                const selection = window.getSelection();
+                if (selection.toString().length > 0) {
+                    selection.removeAllRanges();
+                }
+            });
+            document.addEventListener('contextmenu', e => e.preventDefault());
+
+            // ============ QUESTION NAVIGATION ============
+            function showQuestion(num) {
+                document.querySelectorAll('.question').forEach(q => q.classList.add('hidden'));
+                document.querySelector(`[data-q-num="${num}"]`).classList.remove('hidden');
+                
+                document.querySelectorAll('.q-nav').forEach(btn => {
+                    const btnNum = parseInt(btn.dataset.q);
+                    const isAnswered = btn.classList.contains('answered');
+                    
+                    btn.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-white', 'text-white', 'text-gray-600', 'border-blue-500', 'border-purple-500', 'border-green-500', 'border-gray-300', 'shadow-lg', 'shadow-blue-200', 'shadow-purple-200');
+                    
+                    if (btnNum === num) {
+                        if (isAnswered) {
+                            btn.classList.add('bg-purple-500', 'text-white', 'border-purple-500', 'shadow-lg', 'shadow-purple-200');
+                        } else {
+                            btn.classList.add('bg-blue-500', 'text-white', 'border-blue-500', 'shadow-lg', 'shadow-blue-200');
+                        }
+                    } else if (isAnswered) {
+                        btn.classList.add('bg-green-500', 'text-white', 'border-green-500');
+                    } else {
+                        btn.classList.add('bg-white', 'text-gray-600', 'border-gray-300');
+                    }
+                });
+                
+                currentQuestion = num;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
-        };
-    });
-    </script>
-</body>
-</html>
+
+            document.querySelectorAll('.q-nav').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    showQuestion(parseInt(btn.dataset.q));
+                });
+            });
+
+            document.querySelectorAll('.prev-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (currentQuestion > 1) showQuestion(currentQuestion - 1);
+                });
+            });
+
+            document.querySelectorAll('.next-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (currentQuestion < totalQuestions) showQuestion(currentQuestion + 1);
+                });
+            });
+
+            function registerViolation(reason, extraData = {}) {
+                violations++;
+                
+                // 🚀 LOG TO SERVER (DB)
+                fetch('/assessment/log-violation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        assessment_id: assessmentId,
+                        violation_type: reason,
+                        details: extraData
+                    })
+                }).catch(err => console.error('Log failed:', err));
+                
+                // UI Warning
+                const warningEl = document.getElementById('violation-warning');
+                const countEl = document.getElementById('violation-count');
+                warningEl.classList.remove('hidden');
+                countEl.textContent = violations;
+                
+                console.warn('🚨 VIOLATION:', reason, 'Total:', violations);
+                
+                if (violations >= MAX_VIOLATIONS) {
+                    setTimeout(() => autoSubmit(`3 violations: ${reason}`), 1000);
+                }
+            }
+
+
+            // ============ ANSWER TRACKING ============
+            function updateAnswerCount() {
+                let answered = 0;
+
+                for (let qNum = 1; qNum <= totalQuestions; qNum++) {
+                    const questionId = questionIds[qNum];
+                    const input = document.querySelector(`input[name="question_${questionId}"]:checked`);
+                    const btn = document.querySelector(`.q-nav[data-q="${qNum}"]`);
+
+                    if (input) {
+                        answered++;
+                        if (!btn.classList.contains('answered')) {
+                            btn.classList.add('answered');
+                            const isCurrent = btn.classList.contains('bg-blue-500') || btn.classList.contains('bg-purple-500');
+                            if (isCurrent) {
+                                btn.classList.remove('bg-blue-500', 'border-blue-500', 'shadow-blue-200');
+                                btn.classList.add('bg-purple-500', 'border-purple-500', 'shadow-purple-200');
+                            }
+                        }
+                    } else {
+                        btn.classList.remove('answered');
+                    }
+                }
+
+                // ✅ UPDATE COUNTS
+                document.getElementById('answered-count').textContent = answered;
+
+                // ✅ QUESTION-BASED PROGRESS
+                const progress = Math.round((answered / totalQuestions) * 100);
+                document.getElementById('progress').style.width = `${progress}%`;
+                document.getElementById('progress-text').textContent = `${progress}%`;
+
+                return answered;
+            }
+
+
+            document.querySelectorAll('input[type="radio"]').forEach(input => {
+                input.addEventListener('change', function() {
+                    this.closest('.question').querySelectorAll('.option-label').forEach(label => {
+                        label.classList.remove('border-blue-500', 'bg-blue-50');
+                        label.classList.add('border-gray-200');
+                    });
+                    
+                    const parentLabel = this.closest('.option-label');
+                    parentLabel.classList.remove('border-gray-200');
+                    parentLabel.classList.add('border-blue-500', 'bg-blue-50');
+                    
+                    updateAnswerCount();
+                });
+            });
+
+            // ============ AUTO-SAVE ============
+            function saveAnswers() {
+                const answers = {};
+                
+                for (let qNum = 1; qNum <= totalQuestions; qNum++) {
+                    const questionId = questionIds[qNum];
+                    const input = document.querySelector(`input[name="question_${questionId}"]:checked`);
+                    if (input) {
+                        answers[questionId] = input.value;
+                    }
+                }
+                
+                fetch('/assessment/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        assessment_id: assessmentId,
+                        answers: answers
+                    })
+                }).catch(err => console.error('Save failed:', err));
+            }
+
+            setInterval(saveAnswers, 10000);
+
+            // ============ SUBMISSION ============
+            function showConfirmModal() {
+                const answered = updateAnswerCount();
+                document.getElementById('confirm-answered').textContent = answered;
+                document.getElementById('confirm-unanswered').textContent = totalQuestions - answered;
+                document.getElementById('confirm-modal').classList.remove('hidden');
+            }
+
+            function hideConfirmModal() {
+                document.getElementById('confirm-modal').classList.add('hidden');
+            }
+
+            function submitAssessment() {
+                if (isSubmitting) return;
+                isSubmitting = true;
+                
+                clearInterval(timerInterval);
+                saveAnswers();
+                
+                document.body.innerHTML = `
+                    <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
+                        <div class="bg-white p-12 rounded-3xl shadow-2xl text-center max-w-md mx-auto">
+                            <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">Assessment Submitted!</h2>
+                            <p class="text-gray-600">Redirecting to results...</p>
+                        </div>
+                    </div>
+                `;
+                
+                setTimeout(() => {
+                    window.location.href = '/assessment/results/' + assessmentId;
+                }, 2000);
+            }
+
+            function autoSubmit(reason) {
+                alert(`Assessment auto-submitted: ${reason}`);
+                submitAssessment();
+            }
+
+            const submitBtn = document.getElementById('submit-btn');
+            if (submitBtn) {
+                submitBtn.addEventListener('click', showConfirmModal);
+            }
+            
+            document.getElementById('confirm-submit').addEventListener('click', () => {
+                hideConfirmModal();
+                submitAssessment();
+            });
+            
+            document.getElementById('cancel-submit').addEventListener('click', hideConfirmModal);
+
+            // ============ INITIALIZE ============
+            updateAnswerCount();
+            
+            window.addEventListener('beforeunload', (e) => {
+                if (!isSubmitting) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
+
+            document.querySelectorAll('input[type="radio"]:checked').forEach(input => {
+                const parentLabel = input.closest('.option-label');
+                parentLabel.classList.remove('border-gray-200');
+                parentLabel.classList.add('border-blue-500', 'bg-blue-50');
+            });
+        });
+        </script>
+    </body>
+    </html>

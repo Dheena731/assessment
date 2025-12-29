@@ -8,15 +8,6 @@ use App\Http\Controllers\ResumeController;
 
 /*
 |--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
-Route::get('/', function () {
-    return view('welcome');
-});
-
-/*
-|--------------------------------------------------------------------------
 | Login Route
 |--------------------------------------------------------------------------
 */
@@ -56,13 +47,14 @@ Route::middleware(['auth', 'nocache'])->group(function () {
     Route::get('/', fn() => redirect('/assessment/start'))->name('dashboard');
     
     // 🎯 ASSESSMENT WITH BACK BUTTON PROTECTION
+        Route::get('/assessment/instructions', [AssessmentController::class, 'instructions'])->name('assessment.instructions');
         Route::get('/assessment/start', [AssessmentController::class, 'start'])->name('assessment.start');
         Route::post('/assessment/save', [AssessmentController::class, 'save'])->name('assessment.save');
         Route::get('/assessment/results/{userAssessment}', [AssessmentController::class, 'results'])->name('assessment.results');
+        Route::post('/assessment/log-violation', [AssessmentController::class, 'logViolation']);
+
     
-    
-    // TIME SYNC (Always accessible)
-    Route::get('/assessment/time-sync/{userAssessment}', [AssessmentController::class, 'timeSync'])->name('assessment.time-sync');
+
 });
 
 /*

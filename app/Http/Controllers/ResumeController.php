@@ -97,7 +97,6 @@ private function calculateSkillScore($text): array
 public function index()
 {
     // 🎯 CHECK if user has resume OR active assessment
-    $hasResume = Resume::where('user_id', auth()->id())->exists();  // ✅ FIXED!
     $hasActiveAssessment = UserAssessment::where('user_id', auth()->id())
         ->where('is_completed', false)
         ->exists();
@@ -105,12 +104,6 @@ public function index()
     // 🎯 If has assessment → Go to assessment
     if ($hasActiveAssessment) {
         return redirect('/assessment/start');
-    }
-    
-    // 🎯 If has resume → Go to status
-    if ($hasResume) {
-        $resume = \App\Models\Resume::where('user_id', auth()->id())->latest()->first();
-        return redirect()->route('resume.status', $resume);
     }
     
     // 🎯 No resume → Show upload

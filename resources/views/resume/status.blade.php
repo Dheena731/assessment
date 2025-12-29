@@ -167,7 +167,7 @@
         {{-- Action Buttons --}}
         <div class="space-y-3">
             @if($resume->is_valid)
-                <a href="{{ route('assessment.start') }}" 
+                <a href="{{ route('assessment.instructions') }}" 
                    class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-6 rounded-xl font-semibold text-center block hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
